@@ -76,8 +76,11 @@ class FluentClient extends AbstractFluentAdapter implements ClientInterface
     public function get($clientId, $clientSecret = null, $redirectUri = null, $grantType = null)
     {
         $query = null;
+        $requireSecret = true;
 
         if (!is_null($redirectUri) && is_null($clientSecret)) {
+            $requireSecret = false;
+
             $query = $this->getConnection()->table('oauth_clients')
                    ->select(
                        'oauth_clients.id as id',
@@ -88,14 +91,17 @@ class FluentClient extends AbstractFluentAdapter implements ClientInterface
                    ->where('oauth_clients.id', $clientId)
                    ->where('oauth_client_endpoints.redirect_uri', $redirectUri);
         } elseif (!is_null($clientSecret) && is_null($redirectUri)) {
+            $requireSecret = true;
+
             $query = $this->getConnection()->table('oauth_clients')
                    ->select(
                        'oauth_clients.id as id',
                        'oauth_clients.secret as secret',
                        'oauth_clients.name as name')
-                   ->where('oauth_clients.id', $clientId)
-                   ->where('oauth_clients.secret', $clientSecret);
+                   ->where('oauth_clients.id', $clientId);
         } elseif (!is_null($clientSecret) && !is_null($redirectUri)) {
+            $requireSecret = true;
+
             $query = $this->getConnection()->table('oauth_clients')
                    ->select(
                        'oauth_clients.id as id',
@@ -104,7 +110,6 @@ class FluentClient extends AbstractFluentAdapter implements ClientInterface
                        'oauth_clients.name as name')
                    ->join('oauth_client_endpoints', 'oauth_clients.id', '=', 'oauth_client_endpoints.client_id')
                    ->where('oauth_clients.id', $clientId)
-                   ->where('oauth_clients.secret', $clientSecret)
                    ->where('oauth_client_endpoints.redirect_uri', $redirectUri);
         }
 
@@ -117,6 +122,10 @@ class FluentClient extends AbstractFluentAdapter implements ClientInterface
         $result = $query->first();
 
         if (is_null($result)) {
+            return;
+        }
+
+        if ($requireSecret && ! hash_equals($result->secret, $clientSecret)) {
             return;
         }
 
